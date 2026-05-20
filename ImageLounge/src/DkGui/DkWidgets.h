@@ -121,7 +121,14 @@ public:
     explicit DkFileInfoLabel(QWidget *parent = nullptr);
     ~DkFileInfoLabel() override = default;
 
-    void updateInfo(const QString &filePath, const QString &date, int rating, bool edited);
+    // rawSuffix: when non-empty, appended to the title as " (+SUFFIX)" so the
+    // viewer makes it obvious that the displayed Rendered photo has a hidden Raw
+    // pair member (e.g. "IMG_001.JPG (+CR3)").
+    void updateInfo(const QString &filePath,
+                    const QString &date,
+                    int rating,
+                    bool edited,
+                    const QString &rawSuffix = QString());
 
 public slots:
     void setVisible(bool visible, bool saveSettings = true) override;

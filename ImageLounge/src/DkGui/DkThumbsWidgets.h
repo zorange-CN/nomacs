@@ -34,6 +34,7 @@
 #include <QGraphicsView>
 #include <QPen>
 #include <QPixmapCache>
+#include <QSet>
 #include <QSharedPointer>
 
 #include <optional>
@@ -154,6 +155,7 @@ private:
     QVector<QAction *> contextMenuActions;
 
     std::vector<DkFileInfo> mFiles{};
+    QSet<QString> mHasRawPaths{}; // file paths whose container hasRaw() (for the "+RAW" badge)
 
     struct Thumb {
         LoadThumbnailRequest request{};
@@ -220,6 +222,11 @@ public:
 
     void fetchThumb(float devicePixelRatio);
 
+    // Marks this thumbnail as the Rendered side of a RAW+JPEG pair. When set,
+    // the paint routine overlays a small "+RAW" badge so users can see at a
+    // glance that the photo has a hidden Raw companion.
+    void setHasRaw(bool value);
+
 signals:
     void loadFileSignal(const QString &filePath, bool newTab) const;
     void showFileSignal(const QString &filePath = QString()) const;
@@ -249,6 +256,7 @@ private:
     LoadThumbnailOption mThumbOption = LoadThumbnailOption::none;
     bool mIsHovered = false;
     bool mFillSquare = false;
+    bool mHasRaw = false; // draw "+RAW" badge when true
     int mIndex{}, mRow{}, mCol{};
 
     static constexpr QColor sNoImagePen = QColor(150, 150, 150);
@@ -310,6 +318,7 @@ private:
     QVector<DkThumbLabel *> mThumbLabels;
     QSharedPointer<DkImageLoader> mLoader;
     QVector<DkFileInfo> mThumbs;
+    QSet<QString> mHasRawPaths; // file paths whose container hasRaw() (for the "+RAW" badge)
     DkThumbLoader *mThumbLoader;
     QRectF mLastViewPortRect{};
 };

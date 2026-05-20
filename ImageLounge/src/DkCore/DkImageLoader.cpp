@@ -108,7 +108,7 @@ DkImageLoader::DkImageLoader()
     connect(DkActionManager::instance().action(DkActionManager::sc_delete_silent),
             &QAction::triggered,
             this,
-            &DkImageLoader::deleteFile,
+            &DkImageLoader::deleteFileSilent,
             Qt::UniqueConnection);
 }
 
@@ -1413,8 +1413,17 @@ void DkImageLoader::updateHistory()
 bool DkImageLoader::deleteFile()
 {
     // Plain Delete action (no Shift): default scope is the Rendered side
-    // of the pair (or the lone file when there is no pair).
+    // of the pair (or the lone file when there is no pair). Shift+Delete
+    // goes through deleteFileSilent() and uses Global::silentDeleteScope.
     return deletePairedFile(DeleteScope::Rendered);
+}
+
+bool DkImageLoader::deleteFileSilent()
+{
+    int v = DkSettingsManager::param().global().silentDeleteScope;
+    if (v < 0 || v > 2)
+        v = static_cast<int>(DeleteScope::Both); // safest fallback for unknown values
+    return deletePairedFile(static_cast<DeleteScope>(v));
 }
 
 bool DkImageLoader::deletePairedFile(DeleteScope scope)

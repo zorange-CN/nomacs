@@ -136,6 +136,9 @@ public slots:
     void load(const DkFileInfo &filePath);
     void downloadFile(const QUrl &url);
     bool deleteFile();
+    // Shift+Delete (sc_delete_silent) entry point. Skips confirmation; the
+    // delete scope on a paired photo comes from Global::silentDeleteScope.
+    bool deleteFileSilent();
     QString saveTempFile(const QImage &img,
                          const QString &name = "img",
                          const QString &fileExt = "png",

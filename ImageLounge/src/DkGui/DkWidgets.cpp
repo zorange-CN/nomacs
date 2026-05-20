@@ -1143,18 +1143,28 @@ void DkFileInfoLabel::setVisible(bool visible, bool saveSettings)
     updateWidth();
 }
 
-void DkFileInfoLabel::updateInfo(const QString &filePath, const QString &date, int rating, bool edited)
+void DkFileInfoLabel::updateInfo(const QString &filePath,
+                                 const QString &date,
+                                 int rating,
+                                 bool edited,
+                                 const QString &rawSuffix)
 {
     mFilePath = filePath;
-    updateTitle(filePath, edited);
+    QString txt = edited ? "*" : "";
+    txt += QFileInfo(filePath).fileName();
+    if (!rawSuffix.isEmpty())
+        txt += QStringLiteral(" (+") + rawSuffix + QLatin1Char(')');
+    mTitleLabel->setText(txt);
+    mTitleLabel->setAlignment(Qt::AlignRight);
+
     updateDate(date);
     updateRating(rating);
-
     updateWidth();
 }
 
 void DkFileInfoLabel::updateTitle(const QString &filePath, bool edited)
 {
+    // kept for API compatibility; no Raw-suffix variant (use updateInfo instead)
     QString txt = edited ? "*" : "";
     txt += QFileInfo(filePath).fileName();
     mTitleLabel->setText(txt);

@@ -66,6 +66,39 @@
 namespace nmc
 {
 
+// Shared painter for the "+RAW" badge drawn by both DkThumbLabel (full thumb
+// scene) and DkFilePreview (HUD ribbon). Keeps look-and-feel consistent.
+// Style: semi-transparent gray plate, light text, top-right corner of the
+// thumbnail rect.
+static void drawRawBadge(QPainter *painter, const QRectF &targetRect)
+{
+    if (targetRect.width() < 50)
+        return; // skip on tiny thumbs
+
+    const QString badgeText = QStringLiteral("+RAW");
+    painter->save();
+    QFont f = painter->font();
+    f.setBold(true);
+    int px = qMax(9, qMin(13, int(targetRect.width() / 10)));
+    f.setPixelSize(px);
+    painter->setFont(f);
+    const QFontMetrics fm(f);
+    const int padX = 4;
+    const int padY = 2;
+    const int textW = fm.horizontalAdvance(badgeText);
+    const int textH = fm.height();
+    const QRectF badge(targetRect.right() - textW - padX * 2 - 3,
+                       targetRect.top() + 3,
+                       textW + padX * 2,
+                       textH + padY * 2);
+    painter->setPen(Qt::NoPen);
+    painter->setBrush(QColor(128, 128, 128, 110)); // semi-transparent gray
+    painter->drawRoundedRect(badge, 3, 3);
+    painter->setPen(QColor(255, 255, 255, 220));
+    painter->drawText(badge, Qt::AlignCenter, badgeText);
+    painter->restore();
+}
+
 // DkFilePreview --------------------------------------------------------------------
 DkFilePreview::DkFilePreview(DkThumbLoader *loader, QWidget *parent, Qt::WindowFlags flags)
     : DkFadeWidget(parent, flags)
@@ -466,6 +499,9 @@ void DkFilePreview::drawThumbs(QPainter *painter)
             drawCurrentImgEffect(painter, r);
         else if (idx == selected && r.contains(mousePos))
             drawSelectedEffect(painter, r);
+
+        if (mHasRawPaths.contains(filePath))
+            drawRawBadge(painter, r);
     }
 }
 
@@ -903,9 +939,12 @@ void DkFilePreview::updateThumbs(QVector<QSharedPointer<DkImageContainerT>> imag
     resetThumbs();
 
     mFiles.resize(images.size());
+    mHasRawPaths.clear();
     for (int idx = 0; idx < images.size(); idx++) {
         const auto &imgC = images[idx];
         mFiles[idx] = imgC->originalFileInfo();
+        if (imgC->hasRaw())
+            mHasRawPaths.insert(imgC->filePath());
         if (imgC->isSelected()) {
             currentFileIdx = idx;
         }
@@ -1200,6 +1239,18 @@ void DkThumbLabel::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
         painter->setPen(mSelectPen);
         painter->drawRect(boundingRect());
     }
+
+    // "+RAW" badge: drawn last so it stays visible over hover/selection layers.
+    if (mHasRaw)
+        drawRawBadge(painter, boundingRect());
+}
+
+void DkThumbLabel::setHasRaw(bool value)
+{
+    if (mHasRaw == value)
+        return;
+    mHasRaw = value;
+    update();
 }
 
 QString DkThumbLabel::filePath() const
@@ -1370,8 +1421,11 @@ void DkThumbScene::updateThumbs(QVector<QSharedPointer<DkImageContainerT>> thumb
 
     mThumbs.clear();
     mThumbs.reserve(thumbs.size());
+    mHasRawPaths.clear();
     for (const auto &img : thumbs) {
         mThumbs.push_back(img->originalFileInfo());
+        if (img->hasRaw())
+            mHasRawPaths.insert(img->filePath());
     }
     updateThumbLabels();
 
@@ -1414,6 +1468,7 @@ void DkThumbScene::updateThumbLabels()
     for (; i < end; ++i) {
         DkThumbLabel *thumb = mThumbLabels.at(i);
         thumb->setFileInfo(mThumbs.at(i));
+        thumb->setHasRaw(mHasRawPaths.contains(mThumbs.at(i).path()));
         thumb->setVisible(true);
     }
 
@@ -1421,6 +1476,7 @@ void DkThumbScene::updateThumbLabels()
         auto *thumb = new DkThumbLabel(mThumbLoader,
                                        mThumbs.at(i),
                                        DkSettingsManager::param().display().displaySquaredThumbs);
+        thumb->setHasRaw(mHasRawPaths.contains(mThumbs.at(i).path()));
         connect(thumb, &DkThumbLabel::loadFileSignal, this, &DkThumbScene::loadFileSignal);
         connect(thumb, &DkThumbLabel::showFileSignal, this, &DkThumbScene::showFile);
 

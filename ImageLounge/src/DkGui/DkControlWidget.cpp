@@ -885,7 +885,8 @@ void DkControlWidget::onImageContainerInternalUpdated()
     mCommentWidget->setText(metaData->getDescription());
 
     QString dateString = metaData->getExifValue("DateTimeOriginal");
-    mFileInfoLabel->updateInfo(mImgC->filePath(), dateString, metaData->getRating(), mImgC->isEdited());
+    const QString rawSuffix = mImgC->hasRaw() ? QFileInfo(mImgC->getRaw()->filePath()).suffix().toUpper() : QString();
+    mFileInfoLabel->updateInfo(mImgC->filePath(), dateString, metaData->getRating(), mImgC->isEdited(), rawSuffix);
     mCommentWidget->setText(metaData->getDescription()); // reset
 }
 }

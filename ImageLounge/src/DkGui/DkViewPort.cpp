@@ -405,8 +405,15 @@ void DkViewPort::setImage(const QImage &newImg)
                                                       + QString::number(newImg.height()),
                                                   DkStatusBar::status_dimension_info);
 
-        if (imageContainer())
-            DkStatusBarManager::instance().setMessage(imageContainer()->fileName(), DkStatusBar::status_file_info);
+        if (imageContainer()) {
+            QString fileMsg = imageContainer()->fileName();
+            if (imageContainer()->hasRaw()) {
+                const QString rawSuf = QFileInfo(imageContainer()->getRaw()->filePath()).suffix().toUpper();
+                if (!rawSuf.isEmpty())
+                    fileMsg += QStringLiteral(" (+") + rawSuf + QLatin1Char(')');
+            }
+            DkStatusBarManager::instance().setMessage(fileMsg, DkStatusBar::status_file_info);
+        }
     } else {
         DkStatusBarManager::instance().setMessage("", DkStatusBar::status_zoom_info);
         DkStatusBarManager::instance().setMessage("", DkStatusBar::status_format_info);

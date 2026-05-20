@@ -1782,7 +1782,16 @@ void DkNoMacs::setWindowTitle(QSharedPointer<DkImageContainerT> imgC)
         return;
     }
 
-    setWindowTitle(imgC->filePath(), imgC->image().size(), imgC->isEdited(), imgC->getTitleAttribute());
+    // When this photo has a hidden Raw companion, mirror the (+SUFFIX) hint
+    // from DkFileInfoLabel into the window title (prepended into the existing
+    // attribute string the second overload appends after the filename).
+    QString attr = imgC->getTitleAttribute();
+    if (imgC->hasRaw()) {
+        const QString rawSuf = QFileInfo(imgC->getRaw()->filePath()).suffix().toUpper();
+        if (!rawSuf.isEmpty())
+            attr = QStringLiteral("(+") + rawSuf + QStringLiteral(") ") + attr;
+    }
+    setWindowTitle(imgC->filePath(), imgC->image().size(), imgC->isEdited(), attr);
 }
 
 void DkNoMacs::setWindowTitle(const QString &filePath, const QSize &size, bool edited, const QString &attr)

@@ -267,6 +267,7 @@ public:
         bool loop;
         bool scanSubFolders;
         bool pairRawJpeg; // group RAW+JPEG/HEIF with the same base name as one logical photo
+        bool pairAwareDelete; // when deleting a paired Rendered, prompt to delete both, Rendered only, or Raw only
 
         QString lastSaveDir;
         QStringList recentFiles;

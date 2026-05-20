@@ -638,8 +638,54 @@ void DkViewPort::deleteImage()
     getController()->applyPluginChanges(true);
 
     QFileInfo fileInfo(imgC->filePath());
-    QString question;
 
+    // Pair-aware delete: when the current photo has a hidden Raw member, the
+    // user picks among "both / Rendered only / Raw only" instead of yes/no.
+    // Dialog title/question use the actual file extensions (e.g. "Delete
+    // JPG+CR3 pair") so the affected formats are concrete and translators only
+    // localise the template once.
+    if (imgC->hasRaw() && DkSettingsManager::param().global().pairAwareDelete) {
+        const QSharedPointer<DkImageContainerT> raw = imgC->getRaw();
+        const QString renderedName = fileInfo.fileName();
+        const QString rawName = QFileInfo(raw->filePath()).fileName();
+        const QString renderedSuf = fileInfo.suffix().toUpper();
+        const QString rawSuf = QFileInfo(raw->filePath()).suffix().toUpper();
+
+        QString question;
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+        question = tr("Move %1+%2 pair to trash?\n\nRendered: %3\nRaw: %4")
+                       .arg(renderedSuf, rawSuf, renderedName, rawName);
+#else
+        question = tr("Permanently delete %1+%2 pair?\n\nRendered: %3\nRaw: %4")
+                       .arg(renderedSuf, rawSuf, renderedName, rawName);
+#endif
+
+        // Plain QMessageBox here (not DkMessageBox) — we need custom buttons,
+        // which DkMessageBox's QDialogButtonBox-based API does not expose.
+        QMessageBox msgBox(QMessageBox::Question,
+                           tr("Delete %1+%2 pair").arg(renderedSuf, rawSuf),
+                           question,
+                           QMessageBox::NoButton,
+                           this);
+        QPushButton *bBoth = msgBox.addButton(tr("Delete both"), QMessageBox::AcceptRole);
+        QPushButton *bRendered = msgBox.addButton(tr("Only %1").arg(renderedName), QMessageBox::AcceptRole);
+        QPushButton *bRaw = msgBox.addButton(tr("Only %1").arg(rawName), QMessageBox::AcceptRole);
+        msgBox.addButton(QMessageBox::Cancel);
+        msgBox.setDefaultButton(bBoth);
+        msgBox.setObjectName("deletePairDialog");
+        msgBox.exec();
+
+        QAbstractButton *clicked = msgBox.clickedButton();
+        if (clicked == bBoth)
+            mLoader->deletePairedFile(DkImageLoader::DeleteScope::Both);
+        else if (clicked == bRendered)
+            mLoader->deletePairedFile(DkImageLoader::DeleteScope::Rendered);
+        else if (clicked == bRaw)
+            mLoader->deletePairedFile(DkImageLoader::DeleteScope::Raw);
+        return;
+    }
+
+    QString question;
 #if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
     question = tr("Shall I move %1 to trash?").arg(fileInfo.fileName());
 #else

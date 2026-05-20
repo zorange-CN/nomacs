@@ -1412,6 +1412,13 @@ void DkImageLoader::updateHistory()
  **/
 bool DkImageLoader::deleteFile()
 {
+    // Plain Delete action (no Shift): default scope is the Rendered side
+    // of the pair (or the lone file when there is no pair).
+    return deletePairedFile(DeleteScope::Rendered);
+}
+
+bool DkImageLoader::deletePairedFile(DeleteScope scope)
+{
     if (!mCurrentImage || !mCurrentImage->exists())
         return false;
 
@@ -1420,18 +1427,71 @@ bool DkImageLoader::deleteFile()
         return false;
     }
 
-    QString fileName = mCurrentImage->fileName();
-    int currFileIdx = findFileIdx(mCurrentImage->filePath(), mImages);
-    if (!DkUtils::moveToTrash({mCurrentImage->filePath()})) {
+    QSharedPointer<DkImageContainerT> raw = mCurrentImage->getRaw();
+    const QString renderedPath = mCurrentImage->filePath();
+    const QString rawPath = raw ? raw->filePath() : QString();
+
+    // If the caller asks for Raw-side work but there is no Raw,
+    // degrade gracefully to a plain Rendered delete.
+    if ((scope == DeleteScope::Raw || scope == DeleteScope::Both) && rawPath.isEmpty())
+        scope = DeleteScope::Rendered;
+
+    const bool renderedGone = (scope == DeleteScope::Rendered || scope == DeleteScope::Both);
+    const bool rawGone = !raw || (scope == DeleteScope::Raw || scope == DeleteScope::Both);
+
+    QStringList toTrash;
+    if (renderedGone)
+        toTrash << renderedPath;
+    if (rawGone && !rawPath.isEmpty())
+        toTrash << rawPath;
+
+    // Lightroom-style XMP sidecar (<dir>/<baseName>.xmp) is shared by the pair;
+    // only purge it when the last surviving file of the pair is also being trashed.
+    if (renderedGone && rawGone) {
+        const DkFileInfo fi = mCurrentImage->fileInfo();
+        const QString sidecarPath = fi.dirPath() + QLatin1Char('/') + fi.baseName() + QLatin1String(".xmp");
+        if (QFileInfo::exists(sidecarPath))
+            toTrash << sidecarPath;
+    }
+
+    if (toTrash.isEmpty())
+        return false;
+
+    const QString fileName = mCurrentImage->fileName();
+    const int currFileIdx = findFileIdx(renderedPath, mImages);
+
+    if (!DkUtils::moveToTrash(toTrash)) {
         emit showInfoSignal(tr("Sorry, I could not delete: %1").arg(fileName));
         return false;
     }
 
-    mImages.removeAt(currFileIdx);
-    QSharedPointer<DkImageContainerT> imgC = getSkippedImage(1);
-    if (!imgC)
-        imgC = getSkippedImage(0); // deleted from the end
-    load(imgC);
+    if (renderedGone) {
+        if (currFileIdx >= 0)
+            mImages.removeAt(currFileIdx);
+
+        if (raw && !rawGone) {
+            // Raw survives -> detach it before re-scanning so pairing won't
+            // grab it back, then force the loader to re-read the dir; the Raw
+            // will land in mImages on its own and we navigate to it.
+            mCurrentImage->setRaw(QSharedPointer<DkImageContainerT>());
+            mFolderUpdated = true;
+            loadDir(mCurrentDir, false);
+
+            QSharedPointer<DkImageContainerT> imgC = findFile(rawPath);
+            if (!imgC)
+                imgC = findOrCreateFile(rawPath);
+            load(imgC);
+        } else {
+            QSharedPointer<DkImageContainerT> imgC = getSkippedImage(1);
+            if (!imgC)
+                imgC = getSkippedImage(0); // deleted from the end
+            load(imgC);
+        }
+    } else {
+        // Rendered stays visible, only the Raw was trashed
+        mCurrentImage->setRaw(QSharedPointer<DkImageContainerT>());
+    }
+
     emit showInfoSignal(tr("%1 deleted...").arg(fileName));
     return true;
 }

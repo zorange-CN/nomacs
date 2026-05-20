@@ -89,6 +89,17 @@ public:
     int numFiles() const;
     QImage getPixmap();
 
+    // Pair-aware delete. When the current image has a Raw partner, the UI can
+    // choose to trash both files, just the Rendered side (e.g. JPEG), or just
+    // the Raw side. The same-base-name XMP sidecar (Lightroom convention) is
+    // moved to trash only when the last remaining file of the pair is deleted.
+    enum class DeleteScope {
+        Rendered,
+        Raw,
+        Both
+    };
+    bool deletePairedFile(DeleteScope scope);
+
 signals:
     void updateSpinnerSignalDelayed(bool start = false, int timeDelayed = 700) const;
     void setPlayer(bool play) const;

@@ -209,6 +209,9 @@ public slots:
     void onCacheBoxValueChanged(int value) const;
     void onHistoryBoxValueChanged(int value) const;
     void onSaveGroupButtonClicked(int buttonId) const;
+    void onPairRawJpegToggled(bool checked) const;
+    void onPairAwareDeleteToggled(bool checked) const;
+    void onSilentDeleteScopeChanged(int idx) const;
 
 signals:
     void infoSignal(const QString &msg) const;

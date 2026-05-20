@@ -1277,6 +1277,45 @@ void DkFilePreference::createLayout()
     thumbGroup->addWidget(thumbMemory);
     thumbGroup->addWidget(thumbCacheGroup);
 
+    // RAW+JPEG pairing controls. Lives in the File tab next to Thumbnails /
+    // Image Loading Policy because pairing changes how the file list is
+    // assembled and how delete acts on it.
+    auto *cbPairRawJpeg = new QCheckBox(tr("Group RAW + JPEG/HEIF with the same base name as one photo"), this);
+    cbPairRawJpeg->setToolTip(
+        tr("Same-directory + same base name (one RAW + one Rendered) are shown as a "
+           "single item; the RAW is hidden until you opt in to load it."));
+    cbPairRawJpeg->setChecked(DkSettingsManager::param().global().pairRawJpeg);
+    connect(cbPairRawJpeg, &QCheckBox::toggled, this, &DkFilePreference::onPairRawJpegToggled);
+
+    auto *cbPairAwareDelete = new QCheckBox(tr("Ask which file(s) to delete from a RAW+JPEG pair"), this);
+    cbPairAwareDelete->setToolTip(
+        tr("When deleting a paired photo, prompt to choose between deleting both files, the Rendered "
+           "only, or the RAW only."));
+    cbPairAwareDelete->setChecked(DkSettingsManager::param().global().pairAwareDelete);
+    connect(cbPairAwareDelete, &QCheckBox::toggled, this, &DkFilePreference::onPairAwareDeleteToggled);
+
+    auto *silentScopeLabel = new QLabel(tr("Shift+Delete on a RAW+JPEG pair removes:"), this);
+    auto *silentScopeBox = new QComboBox(this);
+    // Order must match DkImageLoader::DeleteScope: 0=Rendered, 1=Raw, 2=Both.
+    silentScopeBox->addItem(tr("Rendered (JPEG/HEIF) only"));
+    silentScopeBox->addItem(tr("RAW only"));
+    silentScopeBox->addItem(tr("Both files"));
+    int scope = DkSettingsManager::param().global().silentDeleteScope;
+    if (scope < 0 || scope > 2)
+        scope = 2;
+    silentScopeBox->setCurrentIndex(scope);
+    silentScopeBox->setMaximumWidth(260);
+    connect(silentScopeBox,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            &DkFilePreference::onSilentDeleteScopeChanged);
+
+    auto *pairGroup = new DkGroupWidget(tr("RAW+JPEG Pairing"), this);
+    pairGroup->addWidget(cbPairRawJpeg);
+    pairGroup->addWidget(cbPairAwareDelete);
+    pairGroup->addWidget(silentScopeLabel);
+    pairGroup->addWidget(silentScopeBox);
+
     // loading policy
     QVector<QRadioButton *> loadButtons;
     loadButtons.append(new QRadioButton(tr("Skip Images"), this));
@@ -1337,9 +1376,30 @@ void DkFilePreference::createLayout()
     l->addWidget(cacheGroup);
     l->addWidget(historyGroup);
     l->addWidget(thumbGroup);
+    l->addWidget(pairGroup);
     l->addWidget(loadGroup);
     l->addWidget(saveGroup);
     l->addWidget(skipGroup);
+}
+
+void DkFilePreference::onPairRawJpegToggled(bool checked) const
+{
+    if (DkSettingsManager::param().global().pairRawJpeg != checked)
+        DkSettingsManager::param().global().pairRawJpeg = checked;
+}
+
+void DkFilePreference::onPairAwareDeleteToggled(bool checked) const
+{
+    if (DkSettingsManager::param().global().pairAwareDelete != checked)
+        DkSettingsManager::param().global().pairAwareDelete = checked;
+}
+
+void DkFilePreference::onSilentDeleteScopeChanged(int idx) const
+{
+    if (idx < 0 || idx > 2)
+        return;
+    if (DkSettingsManager::param().global().silentDeleteScope != idx)
+        DkSettingsManager::param().global().silentDeleteScope = idx;
 }
 
 void DkFilePreference::onDirChooserDirectoryChanged(const QString &dirPath) const

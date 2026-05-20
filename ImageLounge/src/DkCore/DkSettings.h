@@ -266,6 +266,7 @@ public:
         int numFiles;
         bool loop;
         bool scanSubFolders;
+        bool pairRawJpeg; // group RAW+JPEG/HEIF with the same base name as one logical photo
 
         QString lastSaveDir;
         QStringList recentFiles;

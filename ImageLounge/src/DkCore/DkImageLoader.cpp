@@ -47,9 +47,11 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QHash>
 #include <QMessageBox>
 #include <QPainter>
 #include <QRegularExpression>
+#include <QSet>
 #include <QStringBuilder>
 #include <QStringList>
 #include <QTimer>
@@ -293,8 +295,10 @@ void DkImageLoader::createImages(const DkFileInfoList &files, bool sort)
     qInfo() << "[DkImageLoader]" << mImages.size() << "containers created in" << dt;
 
     if (sort) {
-        DkImageLoader::sort();
+        DkImageLoader::sort(); // sort() also calls pairRawJpeg() and emits updateDirSignal
         qInfo() << "[DkImageLoader] after sorting: " << dt;
+    } else {
+        pairRawJpeg();
     }
 
     // the watched dir didn't necessarily change but we'll do this anyways
@@ -304,6 +308,100 @@ void DkImageLoader::createImages(const DkFileInfoList &files, bool sort)
             mDirWatcher->removePaths(w);
     }
     mDirWatcher->addPath(mCurrentDir);
+}
+
+void DkImageLoader::pairRawJpeg()
+{
+    // Always clear stale Raw pointers first so toggling the setting or
+    // re-scanning never leaves a Rendered container holding an outdated Raw.
+    for (const QSharedPointer<DkImageContainerT> &imgC : std::as_const(mImages))
+        imgC->setRaw(QSharedPointer<DkImageContainerT>());
+
+    if (!DkSettingsManager::param().global().pairRawJpeg)
+        return;
+
+    if (mImages.size() < 2)
+        return;
+
+    // Collect the bare RAW suffixes (e.g. "nef", "cr3") from the raw filter
+    // list, which looks like "Nikon Raw (*.nef *.nrw)".
+    QSet<QString> rawSuffixes;
+    const QStringList &rawFilters = DkSettingsManager::param().app().rawFilters;
+    for (const QString &filter : rawFilters) {
+        const int l = filter.indexOf(QLatin1Char('('));
+        const int r = filter.indexOf(QLatin1Char(')'));
+        if (l < 0 || r <= l)
+            continue;
+        const QStringList pats = filter.mid(l + 1, r - l - 1).split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        for (const QString &p : pats) {
+            const QString t = p.trimmed();
+            if (t.startsWith(QLatin1String("*.")))
+                rawSuffixes.insert(t.mid(2).toLower());
+        }
+    }
+    if (rawSuffixes.isEmpty())
+        return;
+
+    // Group container indices by (directory, base name) so IMG_001.JPG and
+    // IMG_001.CR3 land in the same group.
+    QHash<QString, QVector<int>> groups;
+    for (int i = 0; i < mImages.size(); ++i) {
+        const DkFileInfo fi = mImages.at(i)->fileInfo();
+        const QString key = fi.dirPath() + QLatin1Char('\x1f') + fi.baseName().toLower();
+        groups[key].append(i);
+    }
+
+    QSet<int> hiddenRaw;
+    for (auto it = groups.constBegin(); it != groups.constEnd(); ++it) {
+        const QVector<int> &idxs = it.value();
+        if (idxs.size() < 2)
+            continue;
+
+        // Strict 1:1 pairing: only when the group has exactly one Rendered
+        // member and exactly one Raw member. Any other shape (multiple Raws,
+        // multiple Rendereds, or all-Rendered / all-Raw) means something
+        // unusual is going on (rename collisions, HDR siblings, backups, etc.)
+        // and the safe default is to leave every file independently visible
+        // rather than silently hiding one.
+        int renderedIdx = -1;
+        int rawIdx = -1;
+        bool ambiguous = false;
+        for (int idx : idxs) {
+            const QString suf = mImages.at(idx)->fileInfo().suffix().toLower();
+            if (rawSuffixes.contains(suf)) {
+                if (rawIdx == -1)
+                    rawIdx = idx;
+                else
+                    ambiguous = true;
+            } else {
+                if (renderedIdx == -1)
+                    renderedIdx = idx;
+                else
+                    ambiguous = true;
+            }
+            if (ambiguous)
+                break;
+        }
+
+        if (ambiguous || renderedIdx == -1 || rawIdx == -1)
+            continue; // need exactly one Rendered + exactly one Raw
+
+        mImages.at(renderedIdx)->setRaw(mImages.at(rawIdx));
+        hiddenRaw.insert(rawIdx);
+    }
+
+    if (hiddenRaw.isEmpty())
+        return;
+
+    QVector<QSharedPointer<DkImageContainerT>> filtered;
+    filtered.reserve(mImages.size() - hiddenRaw.size());
+    for (int i = 0; i < mImages.size(); ++i)
+        if (!hiddenRaw.contains(i))
+            filtered.append(mImages.at(i));
+    mImages = filtered;
+
+    qInfo() << "[DkImageLoader] RAW+JPEG pairing: hid" << hiddenRaw.size() << "Raw files," << mImages.size()
+            << "photos shown";
 }
 
 QVector<QSharedPointer<DkImageContainerT>> DkImageLoader::sortImages(
@@ -1717,6 +1815,10 @@ void DkImageLoader::sort()
     std::sort(mImages.begin(), mImages.end(), cmp);
     if (!ascending)
         std::reverse(mImages.begin(), mImages.end());
+
+    // Prune Raw companions before notifying listeners (e.g. DkFilePreview HUD)
+    // so every subscriber of updateDirSignal sees the same paired list as mImages.
+    pairRawJpeg();
 
     emit updateDirSignal(mImages);
 }

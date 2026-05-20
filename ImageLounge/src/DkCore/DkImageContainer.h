@@ -38,6 +38,7 @@ class DkBasicLoader;
 class DkMetaDataT;
 class FileDownloader;
 class DkRotatingRect;
+class DkImageContainerT;
 
 class DllCoreExport DkImageContainer
 {
@@ -88,6 +89,13 @@ public:
     bool exists();
     bool setPageIdx(int skipIdx);
 
+    // RAW+JPEG pairing: this container holds the displayed Rendered side
+    // (JPEG/HEIF), and mRaw points to the hidden Raw member of the pair.
+    // The Raw member is excluded from the loader's file list / thumbnail strip.
+    bool hasRaw() const;
+    QSharedPointer<DkImageContainerT> getRaw() const;
+    void setRaw(const QSharedPointer<DkImageContainerT> &raw);
+
     static QSharedPointer<QByteArray> loadFileToBuffer(const DkFileInfo &fileInfo);
 
     bool loadImage();
@@ -126,6 +134,7 @@ protected:
 
     QSharedPointer<QByteArray> mFileBuffer;
     QSharedPointer<DkBasicLoader> mLoader;
+    QSharedPointer<DkImageContainerT> mRaw;
 
     int mLoadState = not_loaded;
     bool mEdited = false;

@@ -461,6 +461,21 @@ bool DkImageContainer::setPageIdx(int skipIdx)
     return getLoader()->setPageIdx(skipIdx);
 }
 
+bool DkImageContainer::hasRaw() const
+{
+    return !mRaw.isNull();
+}
+
+QSharedPointer<DkImageContainerT> DkImageContainer::getRaw() const
+{
+    return mRaw;
+}
+
+void DkImageContainer::setRaw(const QSharedPointer<DkImageContainerT> &raw)
+{
+    mRaw = raw;
+}
+
 #ifdef Q_OS_WIN
 std::wstring DkImageContainer::getFileNameWStr() const
 {

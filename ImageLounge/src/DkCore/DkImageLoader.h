@@ -158,6 +158,14 @@ protected:
     void updateHistory();
     void sortImagesThreaded(QVector<QSharedPointer<DkImageContainerT>> images);
     void createImages(const DkFileInfoList &files, bool sort = true);
+
+    // RAW+JPEG pairing: after the file list is built/sorted, attach each Raw
+    // file to its same-base-name Rendered sibling as a hidden companion and
+    // drop the Raw from mImages so the browser shows one logical photo. Gated
+    // by DkSettings::Global::pairRawJpeg; clears stale pairing when disabled.
+    // Strict 1:1: a group must contain exactly one Rendered and exactly one Raw,
+    // otherwise nothing is hidden.
+    void pairRawJpeg();
     QVector<QSharedPointer<DkImageContainerT>> sortImages(QVector<QSharedPointer<DkImageContainerT>> images) const;
     void receiveUpdates(bool connectSignals);
 

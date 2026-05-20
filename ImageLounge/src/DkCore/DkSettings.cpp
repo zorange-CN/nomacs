@@ -971,7 +971,7 @@ void DkSettings::setToDefaultSettings()
     global_p.extendedTabs = false;
     global_p.loop = true;
     global_p.scanSubFolders = false;
-    global_p.pairRawJpeg = true;
+    global_p.pairRawJpeg = false;
     global_p.pairAwareDelete = true;
     global_p.silentDeleteScope = 2; // DkImageLoader::DeleteScope::Both
     global_p.lastSaveDir = QString();

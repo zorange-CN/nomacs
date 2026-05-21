@@ -210,6 +210,7 @@ public slots:
     void onHistoryBoxValueChanged(int value) const;
     void onSaveGroupButtonClicked(int buttonId) const;
     void onPairRawJpegToggled(bool checked) const;
+    void onPairMetaMatchToggled(bool checked) const;
     void onPairAwareDeleteToggled(bool checked) const;
     void onSilentDeleteScopeChanged(int idx) const;
 

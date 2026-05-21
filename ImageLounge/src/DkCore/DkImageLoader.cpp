@@ -310,6 +310,21 @@ void DkImageLoader::createImages(const DkFileInfoList &files, bool sort)
     mDirWatcher->addPath(mCurrentDir);
 }
 
+// Reads the Exif capture time (DateTimeOriginal) used to confirm that a
+// basename match is a genuine RAW+JPEG capture pair rather than two unrelated
+// files that happen to share a base name. Returns an empty string when no
+// readable capture time is present. Only metadata is parsed here (no image
+// decode), and only for candidate pairs, so unpaired files cost nothing.
+static QString readCaptureTime(const DkFileInfo &fileInfo)
+{
+    DkMetaDataT meta;
+    meta.readMetaData(fileInfo);
+    QString t = meta.getExifValue("DateTimeOriginal");
+    if (t.isEmpty())
+        t = meta.getExifValue("DateTimeDigitized");
+    return t.trimmed();
+}
+
 void DkImageLoader::pairRawJpeg()
 {
     // Always clear stale Raw pointers first so toggling the setting or
@@ -385,6 +400,20 @@ void DkImageLoader::pairRawJpeg()
 
         if (ambiguous || renderedIdx == -1 || rawIdx == -1)
             continue; // need exactly one Rendered + exactly one Raw
+
+        // Optional second check: confirm the basename match is a real capture
+        // pair by comparing Exif capture time. A camera RAW+JPEG shares an
+        // identical DateTimeOriginal; two unrelated files that merely share a
+        // base name will differ. This is a strict check: if the user asked to
+        // verify by capture time, a file with no readable capture time has
+        // simply not passed verification, so it is left unpaired (real camera
+        // output always carries one).
+        if (DkSettingsManager::param().global().pairRequireMetaMatch) {
+            const QString renderedTime = readCaptureTime(mImages.at(renderedIdx)->fileInfo());
+            const QString rawTime = readCaptureTime(mImages.at(rawIdx)->fileInfo());
+            if (renderedTime.isEmpty() || rawTime.isEmpty() || renderedTime != rawTime)
+                continue; // missing or mismatched capture time -> not a verified pair
+        }
 
         mImages.at(renderedIdx)->setRaw(mImages.at(rawIdx));
         hiddenRaw.insert(rawIdx);

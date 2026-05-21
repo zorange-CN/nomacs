@@ -1287,6 +1287,14 @@ void DkFilePreference::createLayout()
     cbPairRawJpeg->setChecked(DkSettingsManager::param().global().pairRawJpeg);
     connect(cbPairRawJpeg, &QCheckBox::toggled, this, &DkFilePreference::onPairRawJpegToggled);
 
+    auto *cbPairMetaMatch = new QCheckBox(tr("Verify pairs by matching capture time"), this);
+    cbPairMetaMatch->setToolTip(
+        tr("Only pair files whose Exif capture time matches, so two unrelated images that happen to share a "
+           "base name are not grouped. Files without a readable capture time are not paired while this is on. "
+           "Reads metadata for candidate pairs, which can slow down very large folders."));
+    cbPairMetaMatch->setChecked(DkSettingsManager::param().global().pairRequireMetaMatch);
+    connect(cbPairMetaMatch, &QCheckBox::toggled, this, &DkFilePreference::onPairMetaMatchToggled);
+
     auto *cbPairAwareDelete = new QCheckBox(tr("Ask which file(s) to delete from a RAW+JPEG pair"), this);
     cbPairAwareDelete->setToolTip(
         tr("When deleting a paired photo, prompt to choose between deleting both files, the Rendered "
@@ -1312,6 +1320,7 @@ void DkFilePreference::createLayout()
 
     auto *pairGroup = new DkGroupWidget(tr("RAW+JPEG Pairing"), this);
     pairGroup->addWidget(cbPairRawJpeg);
+    pairGroup->addWidget(cbPairMetaMatch);
     pairGroup->addWidget(cbPairAwareDelete);
     pairGroup->addWidget(silentScopeLabel);
     pairGroup->addWidget(silentScopeBox);
@@ -1386,6 +1395,12 @@ void DkFilePreference::onPairRawJpegToggled(bool checked) const
 {
     if (DkSettingsManager::param().global().pairRawJpeg != checked)
         DkSettingsManager::param().global().pairRawJpeg = checked;
+}
+
+void DkFilePreference::onPairMetaMatchToggled(bool checked) const
+{
+    if (DkSettingsManager::param().global().pairRequireMetaMatch != checked)
+        DkSettingsManager::param().global().pairRequireMetaMatch = checked;
 }
 
 void DkFilePreference::onPairAwareDeleteToggled(bool checked) const

@@ -430,6 +430,7 @@ void DkSettings::load(QSettings &settings, bool defaults)
     global_p.loop = settings.value("loop", global_p.loop).toBool();
     global_p.scanSubFolders = settings.value("scanRecursive", global_p.scanSubFolders).toBool();
     global_p.pairRawJpeg = settings.value("pairRawJpeg", global_p.pairRawJpeg).toBool();
+    global_p.pairRequireMetaMatch = settings.value("pairRequireMetaMatch", global_p.pairRequireMetaMatch).toBool();
     global_p.pairAwareDelete = settings.value("pairAwareDelete", global_p.pairAwareDelete).toBool();
     global_p.silentDeleteScope = settings.value("silentDeleteScope", global_p.silentDeleteScope).toInt();
     global_p.searchHistory = settings.value("searchHistory", global_p.searchHistory).toStringList();
@@ -682,6 +683,8 @@ void DkSettings::save(QSettings &settings, bool force)
         settings.setValue("scanRecursive", global_p.scanSubFolders);
     if (force || global_p.pairRawJpeg != global_d.pairRawJpeg)
         settings.setValue("pairRawJpeg", global_p.pairRawJpeg);
+    if (force || global_p.pairRequireMetaMatch != global_d.pairRequireMetaMatch)
+        settings.setValue("pairRequireMetaMatch", global_p.pairRequireMetaMatch);
     if (force || global_p.pairAwareDelete != global_d.pairAwareDelete)
         settings.setValue("pairAwareDelete", global_p.pairAwareDelete);
     if (force || global_p.silentDeleteScope != global_d.silentDeleteScope)
@@ -972,6 +975,7 @@ void DkSettings::setToDefaultSettings()
     global_p.loop = true;
     global_p.scanSubFolders = false;
     global_p.pairRawJpeg = false;
+    global_p.pairRequireMetaMatch = true;
     global_p.pairAwareDelete = true;
     global_p.silentDeleteScope = 2; // DkImageLoader::DeleteScope::Both
     global_p.lastSaveDir = QString();

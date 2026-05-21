@@ -267,6 +267,7 @@ public:
         bool loop;
         bool scanSubFolders;
         bool pairRawJpeg; // group RAW+JPEG/HEIF with the same base name as one logical photo
+        bool pairRequireMetaMatch; // additionally require equal Exif capture time before pairing a basename match
         bool pairAwareDelete; // when deleting a paired Rendered, prompt to delete both, Rendered only, or Raw only
         int silentDeleteScope; // Shift+Delete scope on a paired photo: matches DkImageLoader::DeleteScope (0=Rendered,
                                // 1=Raw, 2=Both)

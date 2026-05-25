@@ -188,6 +188,8 @@ private:
 
     void createShortcuts();
     void drawPolygon(QPainter &painter, const QPolygon &polygon);
+    // draw the press-and-hold focus loupe (1:1 magnifier) overlay
+    void drawLoupe(QPainter &painter);
     void showZoom();
 
     QTimer *mRepeatZoomTimer = nullptr;
@@ -220,6 +222,11 @@ private:
 
     bool mGestureStarted = false;
     bool mDisabledBackground = false; // disables drawBackground() (frameless dialog)
+
+    // focus loupe (Ctrl + left-press-and-hold): shows a 1:1 magnified region
+    bool mLoupeActive = false;
+    QPointF mLoupePos; // cursor position in widget (logical) coordinates
+    int mLoupeSize = 280; // loupe box edge length in logical pixels
 
     // Fading stuff
     bool mAnimationBufferHasAlpha = false;

@@ -286,6 +286,7 @@ public:
         bool horZoomSkips;
         bool doubleClickForFullscreen;
         bool showLogoImage;
+        bool showLoupe; // Ctrl + left-press-and-hold 1:1 focus magnifier
 
         QString setupPath;
         QString setupVersion;

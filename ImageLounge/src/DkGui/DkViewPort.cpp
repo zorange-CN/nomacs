@@ -950,10 +950,75 @@ void DkViewPort::paintEvent(QPaintEvent *event)
         painter.drawPath(path);
     }
 
+    // focus loupe overlay (drawn on top of everything, in widget coordinates)
+    drawLoupe(painter);
+
     painter.end();
 
     // propagate
     QGraphicsView::paintEvent(event);
+}
+
+void DkViewPort::drawLoupe(QPainter &painter)
+{
+    if (!mLoupeActive || mImgStorage.isEmpty())
+        return;
+
+    const QImage img = getImage();
+    if (img.isNull())
+        return;
+
+    const qreal dpr = devicePixelRatioF();
+
+    // image pixel under the cursor (mapToImagePixel already accounts for dpr)
+    const QPointF imgPx = mapToImagePixel(mLoupePos);
+
+    // at 100% one image pixel maps to one device pixel, so the loupe box of
+    // mLoupeSize logical px shows mLoupeSize*dpr image pixels
+    const qreal srcLen = mLoupeSize * dpr;
+    const QRectF srcWanted(imgPx.x() - srcLen / 2.0, imgPx.y() - srcLen / 2.0, srcLen, srcLen);
+
+    // destination box, centered on the cursor and clamped into the viewport
+    QRectF dstBox(0, 0, mLoupeSize, mLoupeSize);
+    dstBox.moveCenter(mLoupePos);
+    const QRectF vp(0, 0, width(), height());
+    if (dstBox.left() < vp.left())
+        dstBox.moveLeft(vp.left());
+    if (dstBox.top() < vp.top())
+        dstBox.moveTop(vp.top());
+    if (dstBox.right() > vp.right())
+        dstBox.moveRight(vp.right());
+    if (dstBox.bottom() > vp.bottom())
+        dstBox.moveBottom(vp.bottom());
+
+    painter.save();
+    painter.setWorldMatrixEnabled(false);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, false); // crisp pixels for focus checking
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    // dark backing (also covers regions outside the image near edges)
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0, 0, 0, 200));
+    painter.drawRect(dstBox);
+
+    // clamp the source to the image and keep the 1:1 scale on the visible part
+    const QRectF src = srcWanted.intersected(QRectF(0, 0, img.width(), img.height()));
+    if (!src.isEmpty()) {
+        const QRectF dst(dstBox.left() + (src.left() - srcWanted.left()) / dpr,
+                         dstBox.top() + (src.top() - srcWanted.top()) / dpr,
+                         src.width() / dpr,
+                         src.height() / dpr);
+        painter.drawImage(dst, img, src);
+    }
+
+    // border
+    QPen pen(DkSettingsManager::param().display().hudFgdColor);
+    pen.setWidthF(1.5);
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(pen);
+    painter.drawRect(dstBox);
+
+    painter.restore();
 }
 
 void DkViewPort::leaveEvent(QEvent *event)
@@ -1160,6 +1225,17 @@ void DkViewPort::dragLeaveEvent(QDragLeaveEvent *event)
 
 void DkViewPort::mousePressEvent(QMouseEvent *event)
 {
+    // focus loupe: Ctrl + left-press-and-hold shows a 1:1 magnifier and
+    // intercepts the gesture so it does not pan / drag the image
+    if (DkSettingsManager::param().global().showLoupe && event->button() == Qt::LeftButton
+        && (event->modifiers() & Qt::ControlModifier) && !mImgStorage.isEmpty()) {
+        mLoupeActive = true;
+        mLoupePos = event->position();
+        setCursor(Qt::BlankCursor); // hide the pointer so it does not obstruct the loupe
+        update();
+        return;
+    }
+
     // if zoom on wheel, the additional keys should be used for switching files
     if (DkSettingsManager::param().global().zoomOnWheel) {
         if (event->buttons() == Qt::XButton1)
@@ -1195,6 +1271,14 @@ void DkViewPort::mousePressEvent(QMouseEvent *event)
 
 void DkViewPort::mouseReleaseEvent(QMouseEvent *event)
 {
+    // releasing ends the focus loupe gesture
+    if (mLoupeActive) {
+        mLoupeActive = false;
+        unsetCursor(); // restore the pointer
+        update();
+        return;
+    }
+
     mRepeatZoomTimer->stop();
 
     int sa = swipeRecognition(event->pos(), mPosGrab.toPoint());
@@ -1235,6 +1319,15 @@ void DkViewPort::mouseDoubleClickEvent(QMouseEvent *event)
 
 void DkViewPort::mouseMoveEvent(QMouseEvent *event)
 {
+    // while the focus loupe is held, follow the cursor and skip pan / drag
+    if (mLoupeActive) {
+        if (event->buttons() & Qt::LeftButton) {
+            mLoupePos = event->position();
+            update();
+        }
+        return;
+    }
+
     if (DkSettingsManager::param().display().showNavigation && event->modifiers() == Qt::NoModifier
         && event->buttons() == Qt::NoButton) {
         int left = qMin(100, qRound(0.1 * width()));

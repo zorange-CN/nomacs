@@ -565,6 +565,7 @@ QMenu *DkActionManager::createPanelMenu(QWidget *parent)
     mPanelMenu->addAction(mPanelActions[menu_panel_explorer]);
     mPanelMenu->addAction(mPanelActions[menu_panel_metadata_dock]);
     mPanelMenu->addAction(mPanelActions[menu_panel_exif]);
+    mPanelMenu->addAction(mPanelActions[menu_panel_photo_info]);
     mPanelMenu->addAction(mPanelActions[menu_panel_history]);
     mPanelMenu->addAction(mPanelActions[menu_panel_preview]);
     mPanelMenu->addAction(mPanelActions[menu_panel_thumbview]);
@@ -675,6 +676,7 @@ QMenu *DkActionManager::createContextMenu(QWidget *parent)
     panelMenu->addAction(mPanelActions[menu_panel_thumbview]);
     panelMenu->addAction(mPanelActions[menu_panel_scroller]);
     panelMenu->addAction(mPanelActions[menu_panel_exif]);
+    panelMenu->addAction(mPanelActions[menu_panel_photo_info]);
     panelMenu->addAction(mPanelActions[menu_panel_overview]);
     panelMenu->addAction(mPanelActions[menu_panel_player]);
     panelMenu->addAction(mPanelActions[menu_panel_info]);
@@ -1300,6 +1302,12 @@ void DkActionManager::createActions(QWidget *parent)
     mPanelActions[menu_panel_exif]->setStatusTip(QObject::tr("Shows the Metadata Panel"));
     mPanelActions[menu_panel_exif]->setCheckable(true);
 
+    mPanelActions[menu_panel_photo_info] = new QAction(QObject::tr("&Photo Info Ribbon"), parent);
+    mPanelActions[menu_panel_photo_info]->setShortcut(QKeySequence(shortcut_show_photo_info));
+    mPanelActions[menu_panel_photo_info]->setStatusTip(
+        QObject::tr("Shows a photographer-oriented capture-settings ribbon"));
+    mPanelActions[menu_panel_photo_info]->setCheckable(true);
+
     mPanelActions[menu_panel_info] = new QAction(QObject::tr("File &Info"), parent);
     mPanelActions[menu_panel_info]->setShortcut(QKeySequence(shortcut_show_info));
     mPanelActions[menu_panel_info]->setStatusTip(QObject::tr("Shows the Info Panel"));
@@ -1800,6 +1808,7 @@ void DkActionManager::enableImageActions(bool enable) const
     action(DkActionManager::menu_panel_comment)->setEnabled(enable);
     action(DkActionManager::menu_panel_preview)->setEnabled(enable);
     action(DkActionManager::menu_panel_exif)->setEnabled(enable);
+    action(DkActionManager::menu_panel_photo_info)->setEnabled(enable);
     action(DkActionManager::menu_panel_overview)->setEnabled(enable);
     action(DkActionManager::menu_panel_player)->setEnabled(enable);
     // action(DkActionManager::menu_panel_thumbview)->setEnabled(enable);	// if we don't disable the thumbnail

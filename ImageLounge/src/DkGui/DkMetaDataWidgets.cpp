@@ -38,12 +38,17 @@
 #include <QAction>
 #include <QCheckBox>
 #include <QContextMenuEvent>
+#include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QFontMetrics>
+#include <QGridLayout>
+#include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
 #include <QMenu>
 #include <QPainter>
+#include <QPixmap>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QScrollArea>
@@ -1146,6 +1151,357 @@ void DkMetaDataHUD::setToDefault()
     mNumColumns = -1;
     mKeyValues = getDefaultKeys();
     updateMetaData(mMetaData);
+}
+
+// DkPhotoInfoPanel --------------------------------------------------------------------
+DkPhotoInfoPanel::DkPhotoInfoPanel(QWidget *parent)
+    : DkFadeWidget(parent)
+{
+    setObjectName("DkPhotoInfoPanel");
+    setCursor(Qt::ArrowCursor);
+
+    loadSettings();
+
+    if (mWindowPosition == pos_west || mWindowPosition == pos_east)
+        mOrientation = Qt::Vertical;
+
+    createLayout();
+    createActions();
+}
+
+DkPhotoInfoPanel::~DkPhotoInfoPanel()
+{
+    saveSettings();
+}
+
+void DkPhotoInfoPanel::createLayout()
+{
+    // reuse the metadata ribbon scrollbar styling so both panels look identical
+    QString scrollbarStyle = QString("QScrollBar:vertical {border: 1px solid "
+                                     + DkUtils::colorToString(DkSettingsManager::param().display().hudFgdColor)
+                                     + "; background: rgba(0,0,0,0); width: 7px; margin: 0 0 0 0;}")
+        + QString("QScrollBar::handle:vertical {background: "
+                  + DkUtils::colorToString(DkSettingsManager::param().display().hudFgdColor) + "; min-height: 0px;}")
+        + QString("QScrollBar::add-line:vertical {height: 0px;}")
+        + QString("QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {background: rgba(0,0,0,0); width: "
+                  "1px;}")
+        + QString("QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {height: 0;}")
+        + QString("QScrollBar:horizontal {border: 1px solid "
+                  + DkUtils::colorToString(DkSettingsManager::param().display().hudFgdColor)
+                  + "; background: rgba(0,0,0,0); height: 7px; margin: 0 0 0 0;}")
+        + QString("QScrollBar::handle:horizontal {background: "
+                  + DkUtils::colorToString(DkSettingsManager::param().display().hudFgdColor) + "; min-width: 0px;}")
+        + QString("QScrollBar::add-line:horizontal {width: 0px;}")
+        + QString("QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {background: rgba(0,0,0,0); "
+                  "height: "
+                  "1px;}")
+        + QString("QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {width: 0;}");
+
+    mScrollArea = new DkResizableScrollArea(this);
+    mScrollArea->setObjectName("DkScrollAreaMetaData");
+    mScrollArea->setWidgetResizable(true);
+    mScrollArea->setStyleSheet(scrollbarStyle + mScrollArea->styleSheet());
+    mScrollArea->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+
+    mContentWidget = new QWidget(this);
+    mContentWidget->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+
+    mContentLayout = new QGridLayout(mContentWidget);
+
+    mEmptyLabel = new QLabel(tr("No capture information"), mContentWidget);
+    mEmptyLabel->setObjectName("DkMetaDataLabel");
+    mEmptyLabel->setVisible(false);
+
+    updateMetaData();
+
+    mScrollArea->setWidget(mContentWidget);
+
+    auto *l = new QVBoxLayout(this);
+    l->setSpacing(0);
+    l->setContentsMargins(3, 3, 3, 3);
+    l->addWidget(mScrollArea);
+}
+
+void DkPhotoInfoPanel::createActions()
+{
+    mActions.resize(action_end);
+
+    mActions[action_pos_west] = new QAction(tr("Show Left"), this);
+    mActions[action_pos_west]->setStatusTip(tr("Shows the Photo Info on the Left"));
+    connect(mActions[action_pos_west], &QAction::triggered, this, &DkPhotoInfoPanel::newPosition);
+
+    mActions[action_pos_north] = new QAction(tr("Show Top"), this);
+    mActions[action_pos_north]->setStatusTip(tr("Shows the Photo Info at the Top"));
+    connect(mActions[action_pos_north], &QAction::triggered, this, &DkPhotoInfoPanel::newPosition);
+
+    mActions[action_pos_east] = new QAction(tr("Show Right"), this);
+    mActions[action_pos_east]->setStatusTip(tr("Shows the Photo Info on the Right"));
+    connect(mActions[action_pos_east], &QAction::triggered, this, &DkPhotoInfoPanel::newPosition);
+
+    mActions[action_pos_south] = new QAction(tr("Show Bottom"), this);
+    mActions[action_pos_south]->setStatusTip(tr("Shows the Photo Info at the Bottom"));
+    connect(mActions[action_pos_south], &QAction::triggered, this, &DkPhotoInfoPanel::newPosition);
+}
+
+void DkPhotoInfoPanel::loadSettings()
+{
+    DefaultSettings settings;
+
+    settings.beginGroup(objectName());
+    mWindowPosition = settings.value("windowPosition", mWindowPosition).toInt();
+    settings.endGroup();
+}
+
+void DkPhotoInfoPanel::saveSettings() const
+{
+    DefaultSettings settings;
+
+    settings.beginGroup(objectName());
+    settings.setValue("windowPosition", mWindowPosition);
+    settings.endGroup();
+}
+
+int DkPhotoInfoPanel::getWindowPosition() const
+{
+    return mWindowPosition;
+}
+
+void DkPhotoInfoPanel::setMetaData(QSharedPointer<DkMetaDataT> metaData)
+{
+    mMetaData = metaData;
+    if (isVisible())
+        updateMetaData();
+}
+
+QVector<DkPhotoInfoPanel::PhotoField> DkPhotoInfoPanel::collectFields(const QSharedPointer<DkMetaDataT> &metaData) const
+{
+    QVector<PhotoField> fields;
+
+    if (!metaData)
+        return fields;
+
+    DkMetaDataHelper &helper = DkMetaDataHelper::getInstance();
+    const QString prefix = QStringLiteral(":/nomacs/img/");
+
+    // camera body (make + model, de-duplicated)
+    const QString make = metaData->getExifValue("Make").trimmed();
+    QString model = metaData->getExifValue("Model").trimmed();
+    QString camera = model;
+    if (!make.isEmpty() && !model.startsWith(make, Qt::CaseInsensitive))
+        camera = (make + " " + model).trimmed();
+    if (camera.isEmpty())
+        camera = make;
+    if (!camera.isEmpty())
+        fields.append({prefix + "camera.svg", tr("Camera"), camera});
+
+    // lens
+    QString lens = metaData->getExifValue("LensModel").trimmed();
+    if (lens.isEmpty())
+        lens = metaData->getXmpValue("Xmp.aux.Lens").trimmed();
+    if (!lens.isEmpty())
+        fields.append({prefix + "lens.svg", tr("Lens"), lens});
+
+    // focal length
+    const QString focal = helper.getFocalLength(metaData).trimmed();
+    if (!focal.isEmpty())
+        fields.append({prefix + "focal-length.svg", tr("Focal length"), focal});
+
+    // aperture
+    const QString aperture = helper.getApertureValue(metaData).trimmed();
+    if (!aperture.isEmpty())
+        fields.append({prefix + "aperture.svg", tr("Aperture"), QStringLiteral("f/") + aperture});
+
+    // shutter speed
+    const QString shutter = helper.getExposureTime(metaData).trimmed();
+    if (!shutter.isEmpty())
+        fields.append({prefix + "shutter.svg", tr("Shutter speed"), shutter});
+
+    // ISO
+    QString iso = metaData->getExifValue("ISOSpeedRatings").trimmed();
+    if (iso.isEmpty())
+        iso = metaData->getExifValue("PhotographicSensitivity").trimmed();
+    if (!iso.isEmpty())
+        fields.append({prefix + "iso.svg", tr("ISO"), QStringLiteral("ISO ") + iso});
+
+    // exposure compensation (always shown when the tag exists, including "0 EV")
+    const QString ev = metaData->getNativeExifValue("Exif.Photo.ExposureBiasValue", true).trimmed();
+    if (!ev.isEmpty())
+        fields.append({prefix + "exposure-comp.svg", tr("Exposure bias"), ev});
+
+    // white balance
+    const QString wb = metaData->getNativeExifValue("Exif.Photo.WhiteBalance", true).trimmed();
+    if (!wb.isEmpty())
+        fields.append({prefix + "white-balance.svg", tr("White balance"), wb});
+
+    // flash (only when the camera actually recorded a flash tag)
+    if (!metaData->getExifValue("Flash").trimmed().isEmpty()) {
+        const QString flash = helper.getFlashMode(metaData).trimmed();
+        if (!flash.isEmpty())
+            fields.append({prefix + "flash.svg", tr("Flash"), flash});
+    }
+
+    // capture date + time (split into two entries so the vertical/left-right
+    // layout stays narrow)
+    QString rawDate = metaData->getExifValue("DateTimeOriginal").trimmed();
+    if (rawDate.isEmpty())
+        rawDate = metaData->getExifValue("DateTimeDigitized").trimmed();
+    if (!rawDate.isEmpty()) {
+        QString dateStr;
+        QString timeStr;
+
+        const QDateTime pd = DkUtils::getConvertableDate(rawDate);
+        if (!pd.isNull()) {
+            dateStr = pd.date().toString(Qt::ISODate); // e.g. 2026-05-21
+            timeStr = pd.time().toString(QStringLiteral("HH:mm:ss"));
+        } else {
+            // fall back to the raw Exif form "YYYY:MM:DD HH:MM:SS"
+            const QStringList parts = rawDate.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+            dateStr = parts.value(0);
+            dateStr.replace(QLatin1Char(':'), QLatin1Char('-'));
+            timeStr = parts.value(1);
+        }
+
+        if (!dateStr.isEmpty())
+            fields.append({prefix + "calendar.svg", tr("Date"), dateStr});
+        if (!timeStr.isEmpty())
+            fields.append({prefix + "clock.svg", tr("Time"), timeStr});
+    }
+
+    // GPS
+    if (helper.hasGPS(metaData)) {
+        const QString gps = helper.getGpsCoordinates(metaData).trimmed();
+        if (!gps.isEmpty())
+            fields.append({prefix + "gps.svg", tr("GPS"), gps});
+    }
+
+    return fields;
+}
+
+QWidget *DkPhotoInfoPanel::createEntryWidget(const PhotoField &field)
+{
+    auto *w = new QWidget(mContentWidget);
+
+    auto *l = new QHBoxLayout(w);
+    l->setContentsMargins(8, 2, 8, 2);
+    l->setSpacing(5);
+
+    const QColor fgd = DkSettingsManager::param().display().hudFgdColor;
+    const int iconSize = qMax(14, QFontMetrics(font()).height());
+
+    auto *iconLabel = new QLabel(w);
+    QPixmap pm = DkImage::loadIcon(field.iconPath, QSize(iconSize, iconSize), fgd);
+    pm.setDevicePixelRatio(DkSettingsManager::param().dpiScaleFactor());
+    iconLabel->setPixmap(pm);
+    iconLabel->setAlignment(Qt::AlignCenter);
+    iconLabel->setToolTip(field.label);
+
+    auto *valLabel = new QLabel(field.value, w);
+    valLabel->setObjectName("DkMetaDataLabel");
+    valLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    valLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    valLabel->setToolTip(field.label);
+
+    l->addWidget(iconLabel);
+    l->addWidget(valLabel);
+
+    return w;
+}
+
+void DkPhotoInfoPanel::updateMetaData()
+{
+    // clean up previous entries
+    for (QWidget *w : mEntryWidgets)
+        delete w;
+    mEntryWidgets.clear();
+    mContentLayout->removeWidget(mEmptyLabel);
+
+    // reset stretch factors (orientation may have changed)
+    for (int idx = 0; idx < 64; idx++) {
+        mContentLayout->setColumnStretch(idx, 0);
+        mContentLayout->setRowStretch(idx, 0);
+    }
+
+    const QVector<PhotoField> fields = collectFields(mMetaData);
+
+    if (fields.isEmpty()) {
+        mContentLayout->addWidget(mEmptyLabel, 0, 0, Qt::AlignCenter);
+        mEmptyLabel->setVisible(true);
+        return;
+    }
+
+    mEmptyLabel->setVisible(false);
+
+    for (const PhotoField &field : fields)
+        mEntryWidgets.append(createEntryWidget(field));
+
+    if (mOrientation == Qt::Horizontal) {
+        // single centered row that scrolls horizontally when it overflows
+        mContentLayout->setColumnStretch(0, 10);
+        for (int idx = 0; idx < mEntryWidgets.size(); idx++)
+            mContentLayout->addWidget(mEntryWidgets.at(idx), 0, idx + 1, Qt::AlignVCenter);
+        mContentLayout->setColumnStretch(mEntryWidgets.size() + 1, 10);
+
+        mScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        mScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    } else {
+        // single column that scrolls vertically
+        for (int idx = 0; idx < mEntryWidgets.size(); idx++)
+            mContentLayout->addWidget(mEntryWidgets.at(idx), idx, 0, Qt::AlignTop | Qt::AlignLeft);
+        mContentLayout->setRowStretch(mEntryWidgets.size(), 10);
+
+        mScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+        mScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    }
+}
+
+void DkPhotoInfoPanel::contextMenuEvent(QContextMenuEvent *event)
+{
+    if (!mContextMenu) {
+        mContextMenu = new QMenu(tr("Photo Info Menu"), this);
+        mContextMenu->addActions(mActions.toList());
+    }
+
+    mContextMenu->exec(event->globalPos());
+    event->accept();
+}
+
+void DkPhotoInfoPanel::setVisible(bool visible, bool saveSetting /* = true */)
+{
+    DkFadeWidget::setVisible(visible, saveSetting);
+    if (mSetWidgetVisible)
+        return; // prevent recursion via fade()
+
+    updateMetaData();
+}
+
+void DkPhotoInfoPanel::newPosition()
+{
+    const auto *sender = static_cast<QAction *>(QObject::sender());
+    if (!sender)
+        return;
+
+    int pos = pos_north;
+    Qt::Orientation orient = Qt::Horizontal;
+
+    if (sender == mActions[action_pos_west]) {
+        pos = pos_west;
+        orient = Qt::Vertical;
+    } else if (sender == mActions[action_pos_east]) {
+        pos = pos_east;
+        orient = Qt::Vertical;
+    } else if (sender == mActions[action_pos_south]) {
+        pos = pos_south;
+        orient = Qt::Horizontal;
+    } else {
+        pos = pos_north;
+        orient = Qt::Horizontal;
+    }
+
+    mWindowPosition = pos;
+    mOrientation = orient;
+    emit positionChangeSignal(mWindowPosition);
+
+    updateMetaData();
 }
 
 // DkCommentTextEdit --------------------------------------------------------------------

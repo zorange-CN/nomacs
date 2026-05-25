@@ -389,18 +389,21 @@ QLabel#DkMetaDataKeyLabel {
 }
 
 nmc--DkManipulatorWidget > QScrollArea,
-nmc--DkMetaDataHUD > QScrollArea {
+nmc--DkMetaDataHUD > QScrollArea,
+nmc--DkPhotoInfoPanel > QScrollArea {
 	background-color: transparent;
 	border: none;
 }
 
 nmc--DkManipulatorWidget > QScrollArea > QWidget > QWidget,
-nmc--DkMetaDataHUD > QScrollArea > QWidget > QWidget {
+nmc--DkMetaDataHUD > QScrollArea > QWidget > QWidget,
+nmc--DkPhotoInfoPanel > QScrollArea > QWidget > QWidget {
 	background-color: transparent;
 	border: none;
 }
 
-nmc--DkMetaDataHUD {
+nmc--DkMetaDataHUD,
+nmc--DkPhotoInfoPanel {
 	background-color: HUD_BACKGROUND_COLOR;
 }
 

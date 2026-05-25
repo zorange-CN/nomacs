@@ -59,6 +59,7 @@ DkControlWidget::DkControlWidget(DkThumbLoader *thumbLoader, DkViewPort *parent,
     // thumbnails, metadata
     mFilePreview = new DkFilePreview(thumbLoader, this, flags);
     mMetaDataInfo = new DkMetaDataHUD(this);
+    mPhotoInfo = new DkPhotoInfoPanel(this);
     mZoomWidget = new DkZoomWidget(this);
     mPlayer = new DkPlayer(this);
     mPlayer->setMaximumHeight(90);
@@ -101,6 +102,7 @@ void DkControlWidget::init()
     // connect widgets with their settings
     mFilePreview->setDisplaySettings(&DkSettingsManager::param().app().showFilePreview);
     mMetaDataInfo->setDisplaySettings(&DkSettingsManager::param().app().showMetaData);
+    mPhotoInfo->setDisplaySettings(&DkSettingsManager::param().app().showPhotoInfo);
     mFileInfoLabel->setDisplaySettings(&DkSettingsManager::param().app().showFileInfoLabel);
     mPlayer->setDisplaySettings(&DkSettingsManager::param().app().showPlayer);
     mHistogram->setDisplaySettings(&DkSettingsManager::param().app().showHistogram);
@@ -119,6 +121,7 @@ void DkControlWidget::init()
     DkActionManager &am = DkActionManager::instance();
     mFilePreview->registerAction(am.action(DkActionManager::menu_panel_preview));
     mMetaDataInfo->registerAction(am.action(DkActionManager::menu_panel_exif));
+    mPhotoInfo->registerAction(am.action(DkActionManager::menu_panel_photo_info));
     mPlayer->registerAction(am.action(DkActionManager::menu_panel_player));
     mCropWidget->registerAction(am.action(DkActionManager::menu_edit_crop));
     mFileInfoLabel->registerAction(am.action(DkActionManager::menu_panel_info));
@@ -218,6 +221,7 @@ void DkControlWidget::init()
     // add elements
     changeThumbNailPosition(mFilePreview->getWindowPosition());
     changeMetaDataPosition(mMetaDataInfo->getWindowPosition());
+    changePhotoInfoPosition(mPhotoInfo->getWindowPosition());
     // hudLayout->addWidget(filePreview, top_thumbs, left_thumbs, 1, hor_pos_end);
     mHudLayout->addWidget(leftWidget, ver_center, left, 1, 1);
     mHudLayout->addWidget(center, ver_center, hor_center, 1, 1);
@@ -259,6 +263,9 @@ void DkControlWidget::connectWidgets()
 
     // metadata widget
     connect(mMetaDataInfo, &DkMetaDataHUD::positionChangeSignal, this, &DkControlWidget::changeMetaDataPosition);
+
+    // photo info ribbon
+    connect(mPhotoInfo, &DkPhotoInfoPanel::positionChangeSignal, this, &DkControlWidget::changePhotoInfoPosition);
 
     // zoom widget
     connect(mZoomWidget, &DkZoomWidget::zoomSignal, mViewport, &DkViewPort::zoomTo);
@@ -316,6 +323,10 @@ void DkControlWidget::connectWidgets()
     connect(am.action(DkActionManager::menu_panel_preview), &QAction::toggled, this, &DkControlWidget::showPreview);
     connect(am.action(DkActionManager::menu_panel_scroller), &QAction::toggled, this, &DkControlWidget::showScroller);
     connect(am.action(DkActionManager::menu_panel_exif), &QAction::toggled, this, &DkControlWidget::showMetaData);
+    connect(am.action(DkActionManager::menu_panel_photo_info),
+            &QAction::toggled,
+            this,
+            &DkControlWidget::showPhotoInfo);
     connect(am.action(DkActionManager::menu_panel_info), &QAction::toggled, this, &DkControlWidget::showFileInfo);
     connect(am.action(DkActionManager::menu_panel_histogram), &QAction::toggled, this, &DkControlWidget::showHistogram);
     connect(am.action(DkActionManager::menu_panel_comment),
@@ -369,6 +380,7 @@ void DkControlWidget::showWidgetsSettings()
     showOverview(mZoomWidget->getCurrentDisplaySetting());
     showPreview(mFilePreview->getCurrentDisplaySetting());
     showMetaData(mMetaDataInfo->getCurrentDisplaySetting());
+    showPhotoInfo(mPhotoInfo->getCurrentDisplaySetting());
     showFileInfo(mFileInfoLabel->getCurrentDisplaySetting());
     showHistogram(mHistogram->getCurrentDisplaySetting());
     showCommentWidget(mCommentWidget->getCurrentDisplaySetting());
@@ -392,6 +404,7 @@ void DkControlWidget::setWidgetsVisible(bool visible, bool saveSettings)
     mFilePreview->setVisible(visible, saveSettings);
     mFolderScroll->setVisible(visible, saveSettings);
     mMetaDataInfo->setVisible(visible, saveSettings);
+    mPhotoInfo->setVisible(visible, saveSettings);
     mFileInfoLabel->setVisible(visible, saveSettings);
     mPlayer->setVisible(visible, saveSettings);
     mZoomWidget->setVisible(visible, saveSettings);
@@ -433,6 +446,17 @@ void DkControlWidget::showMetaData(bool visible)
     } else if (!visible && mMetaDataInfo->isVisible())
         mMetaDataInfo->hide(
             !mViewport->getImage().isNull()); // do not save settings if we have no image in the viewport
+}
+
+void DkControlWidget::showPhotoInfo(bool visible)
+{
+    if (!mPhotoInfo)
+        return;
+
+    if (visible && !mPhotoInfo->isVisible())
+        mPhotoInfo->show();
+    else if (!visible && mPhotoInfo->isVisible())
+        mPhotoInfo->hide(!mViewport->getImage().isNull()); // do not save settings if we have no image in the viewport
 }
 
 void DkControlWidget::showFileInfo(bool visible)
@@ -708,6 +732,7 @@ void DkControlWidget::updateImage(QSharedPointer<DkImageContainerT> imgC, bool u
         if (updateMetadataIfNull) {
             // TODO: is it more correct that we also update other related panels
             mMetaDataInfo->setMetaData(nullptr);
+            mPhotoInfo->setMetaData(nullptr);
         }
         return;
     }
@@ -739,6 +764,19 @@ void DkControlWidget::changeMetaDataPosition(int pos)
         mHudLayout->addWidget(mMetaDataInfo, top_metadata, left_metadata, 1, hor_pos_end - 2);
     } else if (pos == DkFadeWidget::pos_south) {
         mHudLayout->addWidget(mMetaDataInfo, bottom_metadata, left_metadata, 1, hor_pos_end - 2);
+    }
+}
+
+void DkControlWidget::changePhotoInfoPosition(int pos)
+{
+    if (pos == DkFadeWidget::pos_west) {
+        mHudLayout->addWidget(mPhotoInfo, top_metadata, left_metadata, bottom_metadata - top_metadata, 1);
+    } else if (pos == DkFadeWidget::pos_east) {
+        mHudLayout->addWidget(mPhotoInfo, top_metadata, right_metadata, bottom_metadata - top_metadata, 1);
+    } else if (pos == DkFadeWidget::pos_north) {
+        mHudLayout->addWidget(mPhotoInfo, top_metadata, left_metadata, 1, hor_pos_end - 2);
+    } else if (pos == DkFadeWidget::pos_south) {
+        mHudLayout->addWidget(mPhotoInfo, bottom_metadata, left_metadata, 1, hor_pos_end - 2);
     }
 }
 
@@ -877,6 +915,7 @@ void DkControlWidget::onImageContainerInternalUpdated()
 
     const auto metaData = mImgC->getMetaData();
     mMetaDataInfo->setMetaData(metaData);
+    mPhotoInfo->setMetaData(metaData);
 
     if (!metaData) {
         return;

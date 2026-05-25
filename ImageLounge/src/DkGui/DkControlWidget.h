@@ -40,6 +40,7 @@ namespace nmc
 {
 class DkFilePreview;
 class DkMetaDataHUD;
+class DkPhotoInfoPanel;
 class DkCommentWidget;
 class DkViewPort;
 class DkCropWidget;
@@ -122,6 +123,7 @@ public slots:
     void toggleHUD(bool hide);
     void showPreview(bool visible);
     void showMetaData(bool visible);
+    void showPhotoInfo(bool visible);
     void showFileInfo(bool visible);
     void showPlayer(bool visible);
     void startSlideshow(bool start = true);
@@ -132,6 +134,7 @@ public slots:
     void showCommentWidget(bool visible);
     void switchWidget(QWidget *widget = nullptr);
     void changeMetaDataPosition(int pos);
+    void changePhotoInfoPosition(int pos);
     void changeThumbNailPosition(int pos);
     void showScroller(bool visible);
     void setPluginWidget(DkViewPortInterface *pluginWidget, bool removeWidget);
@@ -183,6 +186,7 @@ protected:
 
     DkFilePreview *mFilePreview;
     DkMetaDataHUD *mMetaDataInfo;
+    DkPhotoInfoPanel *mPhotoInfo;
     DkCommentWidget *mCommentWidget;
     DkZoomWidget *mZoomWidget;
     DkPlayer *mPlayer;

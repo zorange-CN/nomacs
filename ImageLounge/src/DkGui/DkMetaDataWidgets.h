@@ -213,6 +213,69 @@ protected:
     Qt::Orientation mOrientation = Qt::Horizontal;
 };
 
+// Photographer-oriented capture-settings ribbon. Reuses the visual style of
+// DkMetaDataHUD (same QSS object names / scroll area), but shows a fixed,
+// curated set of shooting parameters, each prefixed with an icon.
+class DkPhotoInfoPanel : public DkFadeWidget
+{
+    Q_OBJECT
+
+public:
+    explicit DkPhotoInfoPanel(QWidget *parent = nullptr);
+    ~DkPhotoInfoPanel() override;
+
+    int getWindowPosition() const;
+
+    enum {
+        action_pos_west,
+        action_pos_north,
+        action_pos_east,
+        action_pos_south,
+
+        action_end,
+    };
+
+public slots:
+    void setMetaData(QSharedPointer<DkMetaDataT> metaData);
+    void newPosition();
+    void setVisible(bool visible, bool saveSetting = true) override;
+
+signals:
+    void positionChangeSignal(int newPos) const;
+
+protected:
+    struct PhotoField {
+        QString iconPath;
+        QString label;
+        QString value;
+    };
+
+    void createLayout();
+    void createActions();
+    void loadSettings();
+    void saveSettings() const;
+
+    void updateMetaData();
+    QVector<PhotoField> collectFields(const QSharedPointer<DkMetaDataT> &metaData) const;
+    QWidget *createEntryWidget(const PhotoField &field);
+
+    void contextMenuEvent(QContextMenuEvent *event) override;
+
+    QSharedPointer<DkMetaDataT> mMetaData;
+
+    QVector<QWidget *> mEntryWidgets;
+    QLabel *mEmptyLabel = nullptr;
+    QGridLayout *mContentLayout = nullptr;
+    QWidget *mContentWidget = nullptr;
+    DkResizableScrollArea *mScrollArea = nullptr;
+
+    QMenu *mContextMenu = nullptr;
+    QVector<QAction *> mActions;
+
+    int mWindowPosition = pos_north;
+    Qt::Orientation mOrientation = Qt::Horizontal;
+};
+
 class DkCommentTextEdit : public QTextEdit
 {
     Q_OBJECT

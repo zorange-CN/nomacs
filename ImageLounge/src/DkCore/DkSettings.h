@@ -175,6 +175,7 @@ public:
         QBitArray showFileInfoLabel;
         QBitArray showPlayer;
         QBitArray showMetaData;
+        QBitArray showPhotoInfo;
         QBitArray showHistogram;
         QBitArray showOverview;
         QBitArray showScroller;

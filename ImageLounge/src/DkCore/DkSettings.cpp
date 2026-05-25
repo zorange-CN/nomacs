@@ -368,6 +368,9 @@ void DkSettings::load(QSettings &settings, bool defaults)
     tmpShow = settings.value("showMetaData", app_p.showMetaData).toBitArray();
     if (tmpShow.size() == app_p.showMetaData.size())
         app_p.showMetaData = tmpShow;
+    tmpShow = settings.value("showPhotoInfo", app_p.showPhotoInfo).toBitArray();
+    if (tmpShow.size() == app_p.showPhotoInfo.size())
+        app_p.showPhotoInfo = tmpShow;
     tmpShow = settings.value("showPlayer", app_p.showPlayer).toBitArray();
     if (tmpShow.size() == app_p.showPlayer.size())
         app_p.showPlayer = tmpShow;
@@ -621,6 +624,8 @@ void DkSettings::save(QSettings &settings, bool force)
         settings.setValue("showScroller", app_p.showScroller);
     if (force || app_p.showMetaData != app_d.showMetaData)
         settings.setValue("showMetaData", app_p.showMetaData);
+    if (force || app_p.showPhotoInfo != app_d.showPhotoInfo)
+        settings.setValue("showPhotoInfo", app_p.showPhotoInfo);
     if (force || app_p.showPlayer != app_d.showPlayer)
         settings.setValue("showPlayer", app_p.showPlayer);
     if (force || app_p.showHistogram != app_d.showHistogram)
@@ -929,6 +934,7 @@ void DkSettings::setToDefaultSettings()
     app_p.showFilePreview = QBitArray(mode_end, false);
     app_p.showScroller = QBitArray(mode_end, false);
     app_p.showMetaData = QBitArray(mode_end, false);
+    app_p.showPhotoInfo = QBitArray(mode_end, false);
     app_p.showPlayer = QBitArray(mode_end, false);
     app_p.showHistogram = QBitArray(mode_end, false);
     app_p.showComment = QBitArray(mode_end, false);

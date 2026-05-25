@@ -186,6 +186,7 @@ public:
         menu_panel_thumbview,
         menu_panel_scroller,
         menu_panel_exif,
+        menu_panel_photo_info,
         menu_panel_info,
         menu_panel_histogram,
         menu_panel_overview,
@@ -412,6 +413,7 @@ public:
     static constexpr QKeyCombination shortcut_view_slideshow = Qt::Key_Space;
     static constexpr QKeyCombination shortcut_show_player = Qt::Key_P;
     static constexpr QKeyCombination shortcut_show_exif = Qt::Key_M;
+    static constexpr QKeyCombination shortcut_show_photo_info = Qt::SHIFT | Qt::Key_M;
     static constexpr QKeyCombination shortcut_show_info = Qt::Key_I;
     static constexpr QKeyCombination shortcut_show_histogram = Qt::Key_H;
     static constexpr QKeyCombination shortcut_show_comment = Qt::Key_N;
